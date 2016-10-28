@@ -1,0 +1,7 @@
+apiVersion: "wfarr.systems/v1"
+kind: "Example"
+metadata:
+  name: "example1"
+spec:
+  foo: "Hello"
+  bar: true

@@ -1,0 +1,10 @@
+package: github.com/wfarr/k8s-tpr-playground
+import:
+- package: k8s.io/client-go
+  version: ^1.5.0
+  subpackages:
+  - 1.5/pkg/api
+  - 1.5/pkg/api/unversioned
+  - 1.5/pkg/runtime
+  - 1.5/pkg/runtime/serializer
+  - 1.5/rest
