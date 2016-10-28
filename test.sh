@@ -5,6 +5,6 @@ set -eux
 kubectl apply -f extensions/
 kubectl apply -f examples/
 
-kubectl get tests
+kubectl get examples example1
 
 go test -v .
