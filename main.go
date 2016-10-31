@@ -24,41 +24,50 @@ type ExampleSpec struct {
 }
 
 type Example struct {
-	runtime.TypeMeta `json:",inline"`
-	api.ObjectMeta   `json:"metadata"`
+	unversioned.TypeMeta `json:",inline"`
+	Metadata             api.ObjectMeta `json:"metadata"`
 
 	Spec ExampleSpec `json:"spec"`
 }
 
 type ExampleList struct {
-	runtime.TypeMeta     `json:",inline"`
-	unversioned.ListMeta `json:"metadata"`
+	unversioned.TypeMeta `json:",inline"`
+	Metadata             unversioned.ListMeta `json:"metadata"`
 
 	Items []Example `json:"items"`
-}
-
-func (e *Example) UnmarshalText(data []byte) error {
-	return json.Unmarshal(data, e)
-}
-
-func (e *Example) MarshalText() ([]byte, error) {
-	return json.Marshal(e)
 }
 
 func (e *Example) GetObjectKind() unversioned.ObjectKind {
 	return &e.TypeMeta
 }
 
-func (el *ExampleList) UnmarshalText(data []byte) error {
-	return json.Unmarshal(data, el)
-}
-
-func (el *ExampleList) MarshalText() ([]byte, error) {
-	return json.Marshal(el)
-}
-
 func (el *ExampleList) GetObjectKind() unversioned.ObjectKind {
 	return &el.TypeMeta
+}
+
+type ExampleListCopy ExampleList
+type ExampleCopy Example
+
+func (e *Example) UnmarshalJSON(data []byte) error {
+	tmp := ExampleCopy{}
+	err := json.Unmarshal(data, &tmp)
+	if err != nil {
+		return err
+	}
+	tmp2 := Example(tmp)
+	*e = tmp2
+	return nil
+}
+
+func (el *ExampleList) UnmarshalJSON(data []byte) error {
+	tmp := ExampleListCopy{}
+	err := json.Unmarshal(data, &tmp)
+	if err != nil {
+		return err
+	}
+	tmp2 := ExampleList(tmp)
+	*el = tmp2
+	return nil
 }
 
 var (
@@ -116,6 +125,7 @@ func buildClientFromFlags(kubeconfig string) (*rest.RESTClient, error) {
 		Version: "v1",
 	}
 	config.APIPath = "/apis"
+	config.ContentType = runtime.ContentTypeJSON
 	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
 	return rest.RESTClientFor(config)
