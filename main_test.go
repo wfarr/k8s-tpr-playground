@@ -6,9 +6,7 @@ import (
 	"time"
 
 	"k8s.io/client-go/1.5/pkg/api"
-	"k8s.io/client-go/1.5/pkg/api/unversioned"
 	"k8s.io/client-go/1.5/pkg/fields"
-	"k8s.io/client-go/1.5/pkg/runtime"
 	"k8s.io/client-go/1.5/tools/cache"
 )
 
@@ -38,9 +36,6 @@ func TestWithInformer(t *testing.T) {
 	if err != nil {
 		panic(err.Error())
 	}
-
-	schemeBuilder := runtime.NewSchemeBuilder(addKnownTypes)
-	schemeBuilder.AddToScheme(api.Scheme)
 
 	eventchan := make(chan *Example)
 	stopchan := make(chan struct{}, 1)
@@ -83,15 +78,4 @@ func TestWithInformer(t *testing.T) {
 	}
 	// }()
 
-}
-
-func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(unversioned.GroupVersion{Group: "wfarr.systems", Version: "v1"},
-		&Example{},
-		&ExampleList{},
-		&api.ListOptions{},
-		&api.DeleteOptions{},
-	)
-
-	return nil
 }

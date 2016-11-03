@@ -7,12 +7,16 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"k8s.io/client-go/1.5/pkg/api"
+	"k8s.io/client-go/1.5/pkg/api/meta"
 	"k8s.io/client-go/1.5/pkg/api/unversioned"
+	"k8s.io/client-go/1.5/pkg/fields"
 	"k8s.io/client-go/1.5/pkg/runtime"
 	"k8s.io/client-go/1.5/pkg/runtime/serializer"
 	"k8s.io/client-go/1.5/rest"
+	"k8s.io/client-go/1.5/tools/cache"
 	"k8s.io/client-go/1.5/tools/clientcmd"
 
 	_ "k8s.io/client-go/1.5/plugin/pkg/client/auth/gcp"
@@ -41,8 +45,16 @@ func (e *Example) GetObjectKind() unversioned.ObjectKind {
 	return &e.TypeMeta
 }
 
+func (e *Example) GetObjectMeta() meta.Object {
+	return &e.Metadata
+}
+
 func (el *ExampleList) GetObjectKind() unversioned.ObjectKind {
 	return &el.TypeMeta
+}
+
+func (el *ExampleList) GetListMeta() unversioned.List {
+	return &el.Metadata
 }
 
 type ExampleListCopy ExampleList
@@ -103,6 +115,45 @@ func main() {
 	}
 	fmt.Printf("%#v\n", example)
 
+	fmt.Println()
+	fmt.Println("---------------------------------------------------------")
+	fmt.Println()
+
+	eventchan := make(chan *Example)
+	stopchan := make(chan struct{}, 1)
+	source := cache.NewListWatchFromClient(client, "examples", api.NamespaceAll, fields.Everything())
+
+	createDeleteHandler := func(obj interface{}) {
+		example := obj.(*Example)
+		eventchan <- example
+	}
+
+	updateHandler := func(old interface{}, obj interface{}) {
+		example := obj.(*Example)
+		eventchan <- example
+	}
+
+	_, controller := cache.NewInformer(
+		source,
+		&Example{},
+		time.Second*10,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    createDeleteHandler,
+			UpdateFunc: updateHandler,
+			DeleteFunc: createDeleteHandler,
+		})
+
+	go controller.Run(stopchan)
+
+	go func() {
+		for {
+			select {
+			case event := <-eventchan:
+				fmt.Printf("%#v\n", event)
+			}
+		}
+	}()
+
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 	for {
@@ -128,6 +179,9 @@ func buildClientFromFlags(kubeconfig string) (*rest.RESTClient, error) {
 	config.ContentType = runtime.ContentTypeJSON
 	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: api.Codecs}
 
+	schemeBuilder := runtime.NewSchemeBuilder(addKnownTypes)
+	schemeBuilder.AddToScheme(api.Scheme)
+
 	return rest.RESTClientFor(config)
 }
 
@@ -136,4 +190,16 @@ func configFromFlags(kubeconfig string) (*rest.Config, error) {
 		return clientcmd.BuildConfigFromFlags("", kubeconfig)
 	}
 	return rest.InClusterConfig()
+}
+
+func addKnownTypes(scheme *runtime.Scheme) error {
+	scheme.AddKnownTypes(
+		unversioned.GroupVersion{Group: "wfarr.systems", Version: "v1"},
+		&Example{},
+		&ExampleList{},
+		&api.ListOptions{},
+		&api.DeleteOptions{},
+	)
+
+	return nil
 }
